@@ -1,3 +1,8 @@
+# Ignore Vercel related files
 .vercel
-.node_modules
+
+# Ignore Node.js modules
+node_modules/
+
+# Ignore environment files
 .env
