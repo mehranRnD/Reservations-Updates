@@ -6,7 +6,7 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const slackWebhookUrl = "https://hooks.slack.com/services/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";
+const slackWebhookUrl = "https://hooks.slack.com/services/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";
 
 // Middleware to serve static files
 app.use(express.static('public'));
