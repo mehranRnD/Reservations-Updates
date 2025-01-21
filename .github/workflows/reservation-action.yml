@@ -1,0 +1,32 @@
+name: Deploy and Run Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14.x'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Start server using PM2
+        run: |
+          npm install pm2 -g
+          pm2 start server.js
+          pm2 save
+        env:
+          HOSTAWAY_API_URL: "https://api.hostaway.com/v1/reservations"
+          HOSTAWAY_API_KEY: "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI4MDA2NiIsImp0aSI6ImNhYzRlNzlkOWVmZTBiMmZmOTBiNzlkNTEzYzIyZTU1MDhiYWEwNWM2OGEzYzNhNzJhNTU1ZmMzNDI4OTQ1OTg2YWI0NTVjNmJjOWViZjFkIiwiaWF0IjoxNzM2MTY3ODExLjgzNTUyNCwibmJmIjoxNzM2MTY3ODExLjgzNTUyNiwiZXhwIjoyMDUxNzAwNjExLjgzNTUzMSwic3ViIjoiIiwic2NvcGVzIjpbImdlbmVyYWwiXSwic2VjcmV0SWQiOjUzOTUyfQ.Mmqfwt5R4CK5AHwNQFfe-m4PXypLLbAPtzCD7CxgjmagGa0AWfLzPM_panH9fCbYbC1ilNpQ-51KOQjRtaFT3vR6YKEJAUkUSOKjZupQTwQKf7QE8ZbLQDi0F951WCPl9uKz1nELm73V30a8rhDN-97I43FWfrGyqBgt7F8wPkE"
+          HOSTAWAY_API_UPDATE_KEY: "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI4MDA2NiIsImp0aSI6IjI5Yjk2ZjhmNGU1MDM5MzBlY2FiNTMyM2UzMjVhMDYwMDI5NzMyZDNhNjYzZjYzNmU2ZjVhOWRhZjM2MGYzOTQwYmE0YjUzZGE2MWIxMDUwIiwiaWF0IjoxNzM2ODMxOTc3LjM5NzMzMiwibmJmIjoxNzM2ODMxOTc3LjM5NzMzMywiZXhwIjoyMDUyMzY0Nzc3LjM5NzMzNywic3ViIjoiIiwic2NvcGVzIjpbImdlbmVyYWwiXSwic2VjcmV0SWQiOjU0Mjk3fQ.ap4Z4OtDQEZXO1TQj2Yyc_bXPfdIOdBbKGCbdVjrixnZiiezU1lqm69KCGoaTulUFWpjFzMbgPNbOhe8xpf0mKrD0oFjZHv1rc-H4LYgAASiHhb3blLUyz40gmK6zv-A5cpUF-ro3HA6RKSKr6-Tdw53_546xb868nHs3X4YTbk"
