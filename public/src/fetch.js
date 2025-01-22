@@ -71,8 +71,6 @@ async function fetchReservations() {
           <td>${reservation.status || ""}</td>
           <td>${reservation.numberOfGuests || ""}</td>
           <td>${reservation.nights || ""}</td>
-          <td>${reservation.airbnbListingBasePrice || ""}</td>
-          <td>${reservation.airbnbTotalPaidAmount || ""}</td>
         `;
 
         reservationsBody.appendChild(row);
@@ -201,14 +199,158 @@ async function updateAllReservations() {
   }
 }
 
+// Function to calculate number of nights between check-in (3 PM) and check-out (12 PM)
+function calculateNights(checkIn, checkOut) {
+  const start = new Date(checkIn);
+  const end = new Date(checkOut);
+  const diffTime = Math.abs(end - start);
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
 
+// Function to download today's check-outs
+async function downloadReservations() {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const response = await fetch("/api/reservations");
+    const data = await response.json();
+    const reservations = data.result;
 
-// Set an interval to call updateAllReservations every 10 minutes (600000 ms)
-setInterval(() => {
-  console.log("Triggering updateAllReservations...");
-  updateAllReservations();
-}, 600000); // 600000 ms = 10 minutes
+    // Filter reservations for today's check-outs
+    const todayCheckouts = reservations.filter(
+      (reservation) => reservation.departureDate === today
+    );
 
+    if (todayCheckouts.length === 0) {
+      console.log("No check-outs for today!");
+      return;
+    }
+
+    // Create data for Excel
+    const excelData = [
+      [
+        "No.",
+        "Name",
+        "Room Number",
+        "Channel",
+        "Price",
+        "Check-in Date",
+        "Check-out Date",
+        "Nights",
+      ], // Headers
+    ];
+
+    // Add data rows
+    todayCheckouts.forEach((reservation, index) => {
+      const apartmentName =
+        apartmentMapping[reservation.listingMapId] || "Unknown Apartment";
+      const nights = calculateNights(
+        reservation.arrivalDate,
+        reservation.departureDate
+      );
+
+      excelData.push([
+        index + 1,
+        reservation.guestName,
+        apartmentName,
+        reservation.channelName,
+        `${reservation.totalPrice} ${reservation.currency}`,
+        `${reservation.arrivalDate} (3:00 PM)`,
+        `${reservation.departureDate} (12:00 PM)`,
+        nights,
+      ]);
+    });
+
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+    // Set column widths
+    const colWidths = [
+      { wch: 5 }, // No.
+      { wch: 20 }, // Name
+      { wch: 15 }, // Room Number
+      { wch: 15 }, // Channel
+      { wch: 15 }, // Price
+      { wch: 20 }, // Check-in Date
+      { wch: 20 }, // Check-out Date
+      { wch: 10 }, // Nights
+    ];
+    ws["!cols"] = colWidths;
+
+    // Set font style for all cells
+    for (let cell in ws) {
+      if (cell[0] === "!") continue; // Skip special keys like !ref
+
+      // Apply the font style for all cells
+      ws[cell].s = {
+        font: {
+          name: "Segoe UI",
+          sz: 7,
+        },
+      };
+    }
+
+    // Make headers bold and apply font settings for headers as well
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cell = XLSX.utils.encode_cell({ r: 0, c: C });
+      ws[cell].s = {
+        font: {
+          name: "Segoe UI",
+          sz: 7,
+          bold: true,
+        },
+      };
+    }
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Today's Check-outs");
+
+    // Get today's date in DD-MM-YYYY format for filename
+    const dateStr = new Date().toLocaleDateString("en-GB").replace(/\//g, "-");
+
+    // Download the file
+    const wopts = {
+      bookType: "xlsx",
+      bookSST: false,
+      type: "binary",
+      cellStyles: true,
+    };
+    XLSX.writeFile(wb, `Check-outs_${dateStr}.xlsx`, wopts);
+
+    // Also log to console for reference
+    console.log(`Today's Check-outs (Total: ${todayCheckouts.length}):`);
+    todayCheckouts.forEach((reservation, index) => {
+      const apartmentName =
+        apartmentMapping[reservation.listingMapId] || "Unknown Apartment";
+      const nights = calculateNights(
+        reservation.arrivalDate,
+        reservation.departureDate
+      );
+
+      console.log(`
+Check-out #${index + 1}
+Guest Name: ${reservation.guestName}
+Apartment: ${apartmentName}
+Channel: ${reservation.channelName}
+Price: ${reservation.totalPrice} ${reservation.currency}
+Check-in: ${reservation.arrivalDate} (3:00 PM)
+Check-out: ${reservation.departureDate} (12:00 PM)
+Nights: ${nights}
+-------------------`);
+    });
+  } catch (error) {
+    console.error("Error fetching today's check-outs:", error);
+  }
+}
+
+// Expose the new function globally
+window.downloadReservations = downloadReservations;
+
+// Expose the new function globally
+window.downloadReservations = downloadReservations;
+// Expose the new function globally
+window.downloadReservations = downloadReservations;
 
 // Expose functions globally
 window.fetchReservations = fetchReservations;

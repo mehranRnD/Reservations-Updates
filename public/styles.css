@@ -1,0 +1,128 @@
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 95%;
+    margin: 0 auto;
+  }
+
+  .page-header {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    color: white;
+    padding: 2rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    animation: slideDown 0.5s ease-out;
+  }
+
+  .table-container {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  .table {
+    margin-bottom: 0;
+  }
+
+  .table thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .table tbody tr {
+    transition: all 0.3s ease;
+  }
+
+  .table tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: translateX(5px);
+  }
+
+  .update-button,
+  .download-button {
+    background: linear-gradient(135deg, #1a5dc1, #3e0d0d);
+    border: none;
+    padding: 10px 20px;
+    color: white;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+  }
+  
+
+  .update-button:hover,
+  .download-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .update-button:disabled,
+  .download-button:disabled {
+    background: #6c757d;
+    transform: none;
+  }
+
+  .loading {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+  }
+
+  .spinner-border {
+    margin-right: 10px;
+  }
+  table th {
+    padding: 20px 30px; /* Increased padding for better spacing */
+    text-align: center; /* Ensures the text is centered */
+    font-weight: bold;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-size: 14px; /* Adjusted font size */
+    margin-right: 10px; /* Added margin to space out the columns */
+  }
+
+  @media (max-width: 768px) {
+    table th {
+      padding: 10px 15px; /* Slightly smaller padding for smaller screens */
+    }
+  }
+
+  /* Animations */
+  @keyframes slideDown {
+    from {
+      transform: translateY(-20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Responsive table */
+  @media (max-width: 768px) {
+    .table-responsive {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+  }
