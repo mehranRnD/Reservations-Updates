@@ -1,4 +1,5 @@
 const slackEndpoint = "/api/slack"; // Server-side Slack endpoint
+const slackWebhookUrl2 = "https://hooks.slack.com/services/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";
 
 // Define the mapping of listingMapId to apartment names
 const apartmentMapping = {
@@ -236,6 +237,13 @@ async function downloadReservations() {
         "Check-in Date",
         "Check-out Date",
         "Nights",
+        "Review Taken?",
+        "Platform",
+        "Rating /5",
+        "Suggestion about stay",
+        "Complaints",
+        "Status",
+        "Suggestions for FD"
       ], // Headers
     ];
 
@@ -254,8 +262,8 @@ async function downloadReservations() {
         apartmentName,
         reservation.channelName,
         `${reservation.totalPrice} ${reservation.currency}`,
-        `${reservation.arrivalDate} (3:00 PM)`,
-        `${reservation.departureDate} (12:00 PM)`,
+        `${reservation.arrivalDate} `,
+        `${reservation.departureDate} `,
         nights,
       ]);
     });
@@ -265,15 +273,23 @@ async function downloadReservations() {
 
     // Set column widths
     const colWidths = [
-      { wch: 5 }, // No.
-      { wch: 20 }, // Name
-      { wch: 15 }, // Room Number
-      { wch: 15 }, // Channel
-      { wch: 15 }, // Price
-      { wch: 20 }, // Check-in Date
-      { wch: 20 }, // Check-out Date
-      { wch: 10 }, // Nights
+      { wch: 3 },  // No.
+      { wch: 23 }, // Name
+      { wch: 13 }, // Room Number
+      { wch: 12 }, // Channel
+      { wch: 13 }, // Price
+      { wch: 15 }, // Check-in Date
+      { wch: 15 }, // Check-out Date
+      { wch: 5 }, // Nights
+      { wch: 12 }, // Review Taken?
+      { wch: 10 }, // Platform
+      { wch: 6 }, // Rating /5
+      { wch: 20 }, // Suggestion about stay
+      { wch: 20 }, // Complaints
+      { wch: 10 }, // Status
+      { wch: 20 }, // Suggestions for FD
     ];
+    
     ws["!cols"] = colWidths;
 
     // Set font style for all cells
@@ -334,8 +350,8 @@ Guest Name: ${reservation.guestName}
 Apartment: ${apartmentName}
 Channel: ${reservation.channelName}
 Price: ${reservation.totalPrice} ${reservation.currency}
-Check-in: ${reservation.arrivalDate} (3:00 PM)
-Check-out: ${reservation.departureDate} (12:00 PM)
+Check-in: ${reservation.arrivalDate} 
+Check-out: ${reservation.departureDate} 
 Nights: ${nights}
 -------------------`);
     });
@@ -344,17 +360,7 @@ Nights: ${nights}
   }
 }
 
-// Expose the new function globally
 window.downloadReservations = downloadReservations;
-
-// Expose the new function globally
-window.downloadReservations = downloadReservations;
-// Expose the new function globally
-window.downloadReservations = downloadReservations;
-
-// Expose functions globally
 window.fetchReservations = fetchReservations;
 window.updateAllReservations = updateAllReservations;
-
-// Load reservations on page load
 fetchReservations();

@@ -6,8 +6,7 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const slackWebhookUrl = "https://hooks.slack.com/services/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";
-
+const slackWebhookUrl1 = "https://hooks.slack.com/services/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";
 // Middleware to serve static files
 app.use(express.static('public'));
 app.use(bodyParser.json());
@@ -48,7 +47,7 @@ app.put('/api/reservations/:id', async (req, res) => {
 app.post("/api/slack", async (req, res) => {
     try {
       const { text } = req.body;
-      await axios.post(slackWebhookUrl, { text }, {
+      await axios.post(slackWebhookUrl1, { text }, {
         headers: { "Content-Type": "application/json" },
       });
       res.status(200).send("Message sent to Slack");
