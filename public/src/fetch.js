@@ -1,5 +1,5 @@
 const slackEndpoint = "/api/slack"; // Server-side Slack endpoint
-const slackWebhookUrl2 = "https://hooks.slack.com/services/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";
+
 
 // Define the mapping of listingMapId to apartment names
 const apartmentMapping = {
@@ -108,95 +108,91 @@ async function sendMessageToSlack(message) {
   }
 }
 
-// Generate Slack message
-function generateSlackMessage(
-  reservationId,
-  guestName,
-  apartmentName,
-  updates
-) {
+// Generate Slack message with modified user
+// Generate Slack message with modified user
+function generateSlackMessage(reservationId, guestName, apartmentName, updates, modifiedByUser) {
   const emojiHeader = "📢 *Updated field for ID*:";
   const fields = [
-    `*Name*: ${guestName || "N/A"} has booked ${apartmentName || "N/A"}`,
+      `*Name*: ${guestName || "N/A"} has booked ${apartmentName || "N/A"}`,
   ];
 
   updates.forEach(({ field, oldValue, newValue }) => {
-    fields.push(
-      `*${field}*: Changed from ${oldValue || "N/A"} to ${newValue || "N/A"}`
-    );
+      fields.push(`*${field}*: Changed from ${oldValue || "N/A"} to ${newValue || "N/A"}`);
   });
+
+  fields.push(`*Modified by*: ${modifiedByUser || "Unknown"}`); // Include user who modified the reservation
 
   return `${emojiHeader} *${reservationId}*\n${fields.join("\n")}`;
 }
 
 // Update reservations and detect changes
+// Update reservations and detect changes
 async function updateAllReservations() {
   try {
-    const response = await fetch("/api/reservations");
-    const data = await response.json();
-    const updatedReservations = data.result;
-    let hasUpdates = false;
+      const response = await fetch("/api/reservations");
+      const data = await response.json();
+      const updatedReservations = data.result;
+      let hasUpdates = false;
 
-    const fieldDisplayNames = {
-      guestName: "Name",
-      totalPrice: "Price",
-      apartmentName: "Apartment",
-      arrivalDate: "Arrival Date",
-      departureDate: "Departure Date",
-      numberOfGuests: "Number of Guests",
-      nights: "Number of Nights",
-    };
+      const fieldDisplayNames = {
+          guestName: "Name",
+          totalPrice: "Price",
+          apartmentName: "Apartment",
+          arrivalDate: "Arrival Date",
+          departureDate: "Departure Date",
+          numberOfGuests: "Number of Guests",
+          nights: "Number of Nights",
+      };
 
-    const fieldsToCheck = Object.keys(fieldDisplayNames);
+      const fieldsToCheck = Object.keys(fieldDisplayNames);
 
-    updatedReservations.forEach((reservation) => {
-      if (reservation.status === "modified") {
-        const oldReservation = window.oldReservations.find(
-          (r) => r.hostawayReservationId === reservation.hostawayReservationId
-        );
+      updatedReservations.forEach((reservation) => {
+          if (reservation.status === "modified") {
+              const oldReservation = window.oldReservations.find(
+                  (r) => r.hostawayReservationId === reservation.hostawayReservationId
+              );
 
-        const updates = [];
-        fieldsToCheck.forEach((field) => {
-          const oldValue = oldReservation ? oldReservation[field] : null;
-          const newValue = reservation[field];
+              const updates = [];
+              fieldsToCheck.forEach((field) => {
+                  const oldValue = oldReservation ? oldReservation[field] : null;
+                  const newValue = reservation[field];
 
-          if (
-            oldValue !== newValue &&
-            oldValue !== null &&
-            oldValue !== "N/A"
-          ) {
-            updates.push({
-              field: fieldDisplayNames[field],
-              oldValue,
-              newValue,
-            });
+                  if (oldValue !== newValue && oldValue !== null && oldValue !== "N/A") {
+                      updates.push({
+                          field: fieldDisplayNames[field],
+                          oldValue,
+                          newValue,
+                      });
+                  }
+              });
+
+              if (updates.length > 0) {
+                  hasUpdates = true;
+                  const apartmentName = apartmentMapping[reservation.listingMapId] || "Unknown Apartment";
+                  const modifiedByUser = reservation.modifiedByUser || "Unknown";
+
+                  console.log(`🔹 Reservation ${reservation.hostawayReservationId} modified by: ${modifiedByUser}`);
+
+                  const message = generateSlackMessage(
+                      reservation.hostawayReservationId,
+                      reservation.guestName,
+                      apartmentName,
+                      updates,
+                      modifiedByUser
+                  );
+                  console.log("🔹 Sending Slack Message: \n", message);
+                  sendMessageToSlack(message);
+              }
           }
-        });
+      });
 
-        if (updates.length > 0) {
-          hasUpdates = true;
-          const apartmentName =
-            apartmentMapping[reservation.listingMapId] || "Unknown Apartment";
-          const message = generateSlackMessage(
-            reservation.hostawayReservationId,
-            reservation.guestName,
-            apartmentName,
-            updates
-          );
-          sendMessageToSlack(message);
-        }
+      if (!hasUpdates) {
+          console.log("✅ No reservation updates detected.");
       }
-    });
 
-    if (!hasUpdates) {
-      sendMessageToSlack(
-        "✅ There are currently no updates to the reservations. Wait for the updates."
-      );
-    }
-
-    window.oldReservations = updatedReservations;
+      window.oldReservations = updatedReservations;
   } catch (error) {
-    console.error("Error updating reservations:", error);
+      console.error("❌ Error updating reservations:", error);
   }
 }
 
@@ -243,7 +239,7 @@ async function downloadReservations() {
         "Suggestion about stay",
         "Complaints",
         "Status",
-        "Suggestions for FD"
+        "Suggestions for FD",
       ], // Headers
     ];
 
@@ -273,7 +269,7 @@ async function downloadReservations() {
 
     // Set column widths
     const colWidths = [
-      { wch: 3 },  // No.
+      { wch: 3 }, // No.
       { wch: 23 }, // Name
       { wch: 13 }, // Room Number
       { wch: 12 }, // Channel
@@ -289,7 +285,7 @@ async function downloadReservations() {
       { wch: 10 }, // Status
       { wch: 20 }, // Suggestions for FD
     ];
-    
+
     ws["!cols"] = colWidths;
 
     // Set font style for all cells
@@ -345,15 +341,15 @@ async function downloadReservations() {
       );
 
       console.log(`
-Check-out #${index + 1}
-Guest Name: ${reservation.guestName}
-Apartment: ${apartmentName}
-Channel: ${reservation.channelName}
-Price: ${reservation.totalPrice} ${reservation.currency}
-Check-in: ${reservation.arrivalDate} 
-Check-out: ${reservation.departureDate} 
-Nights: ${nights}
--------------------`);
+      Check-out #${index + 1}
+      Guest Name: ${reservation.guestName}
+      Apartment: ${apartmentName}
+      Channel: ${reservation.channelName}
+      Price: ${reservation.totalPrice} ${reservation.currency}
+      Check-in: ${reservation.arrivalDate} 
+      Check-out: ${reservation.departureDate} 
+      Nights: ${nights}
+      -------------------`);
     });
   } catch (error) {
     console.error("Error fetching today's check-outs:", error);
@@ -364,3 +360,4 @@ window.downloadReservations = downloadReservations;
 window.fetchReservations = fetchReservations;
 window.updateAllReservations = updateAllReservations;
 fetchReservations();
+
