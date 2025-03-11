@@ -1,6 +1,5 @@
 const slackEndpoint = "/api/slack"; // Server-side Slack endpoint
 
-
 // Define the mapping of listingMapId to apartment names
 const apartmentMapping = {
   288675: "1F-17 (S)",
@@ -42,18 +41,25 @@ async function fetchReservations() {
   try {
     const response = await fetch("/api/reservations");
     const data = await response.json();
+    // console.log("📌 Hostaway Reservation Response:", data.result); // Debugging
+
+
     const reservationsBody = document.getElementById("reservations");
     reservationsBody.innerHTML = ""; // Clear existing content
 
     const reservations = data.result;
 
     if (Array.isArray(reservations) && reservations.length > 0) {
-      window.oldReservations = reservations; // Store data for later comparison
+      window.oldReservations = reservations; // Store for comparison
 
       reservations.forEach((reservation, index) => {
         const apartmentName =
-          apartmentMapping[reservation.listingMapId] ||
-          reservation.listingMapId;
+          apartmentMapping[reservation.listingMapId] || reservation.listingMapId;
+
+        const modifiedByUserId = reservation.modifiedByUserId || null; // Extract modifiedByUserId
+        const userName = window.hostawayUsers[modifiedByUserId] || "Unknown User";
+
+        // console.log(`🔹 Reservation ID ${reservation.hostawayReservationId} modified by: ${modifiedByUserId} (${userName})`);
 
         const row = document.createElement("tr");
         row.setAttribute("data-id", reservation.hostawayReservationId);
@@ -72,6 +78,7 @@ async function fetchReservations() {
           <td>${reservation.status || ""}</td>
           <td>${reservation.numberOfGuests || ""}</td>
           <td>${reservation.nights || ""}</td>
+          <td>${userName}</td> <!-- Display the user who modified the reservation -->
         `;
 
         reservationsBody.appendChild(row);
@@ -81,7 +88,7 @@ async function fetchReservations() {
         '<tr><td colspan="15">No reservations found for the last three months.</td></tr>';
     }
   } catch (error) {
-    console.error("Error fetching reservations:", error);
+    console.error("❌ Error fetching reservations:", error);
     document.getElementById("reservations").innerHTML =
       '<tr><td colspan="15">Error fetching reservations.</td></tr>';
   }
@@ -108,93 +115,119 @@ async function sendMessageToSlack(message) {
   }
 }
 
-// Generate Slack message with modified user
-// Generate Slack message with modified user
-function generateSlackMessage(reservationId, guestName, apartmentName, updates, modifiedByUser) {
+// Generate Slack message
+function generateSlackMessage(reservationId, guestName, apartmentName, updates, userName) {
   const emojiHeader = "📢 *Updated field for ID*:";
   const fields = [
-      `*Name*: ${guestName || "N/A"} has booked ${apartmentName || "N/A"}`,
+    `*Name*: ${guestName || "N/A"} has booked ${apartmentName || "N/A"}`,
   ];
 
   updates.forEach(({ field, oldValue, newValue }) => {
-      fields.push(`*${field}*: Changed from ${oldValue || "N/A"} to ${newValue || "N/A"}`);
+    fields.push(
+      `*${field}*: Changed from ${oldValue || "N/A"} to ${newValue || "N/A"}`
+    );
   });
 
-  fields.push(`*Modified by*: ${modifiedByUser || "Unknown"}`); // Include user who modified the reservation
+  // 🔥 Ensure the correct user name is displayed
+  fields.push(`*Modifications by*: ${userName || "Unknown User"}`);
 
   return `${emojiHeader} *${reservationId}*\n${fields.join("\n")}`;
 }
 
-// Update reservations and detect changes
-// Update reservations and detect changes
-async function updateAllReservations() {
+
+
+async function fetchUsers() {
   try {
-      const response = await fetch("/api/reservations");
-      const data = await response.json();
-      const updatedReservations = data.result;
-      let hasUpdates = false;
+    const response = await fetch('/api/users');
+    const data = await response.json();
+    // console.log("📌 Fetching users...");
 
-      const fieldDisplayNames = {
-          guestName: "Name",
-          totalPrice: "Price",
-          apartmentName: "Apartment",
-          arrivalDate: "Arrival Date",
-          departureDate: "Departure Date",
-          numberOfGuests: "Number of Guests",
-          nights: "Number of Nights",
-      };
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
 
-      const fieldsToCheck = Object.keys(fieldDisplayNames);
+    // 🔥 Store users dynamically in an object for easy lookup
+    window.hostawayUsers = {};
+    data.result.forEach(user => {
+      window.hostawayUsers[user.id] = `${user.firstName} ${user.lastName || ""}`;
+    });
 
-      updatedReservations.forEach((reservation) => {
-          if (reservation.status === "modified") {
-              const oldReservation = window.oldReservations.find(
-                  (r) => r.hostawayReservationId === reservation.hostawayReservationId
-              );
-
-              const updates = [];
-              fieldsToCheck.forEach((field) => {
-                  const oldValue = oldReservation ? oldReservation[field] : null;
-                  const newValue = reservation[field];
-
-                  if (oldValue !== newValue && oldValue !== null && oldValue !== "N/A") {
-                      updates.push({
-                          field: fieldDisplayNames[field],
-                          oldValue,
-                          newValue,
-                      });
-                  }
-              });
-
-              if (updates.length > 0) {
-                  hasUpdates = true;
-                  const apartmentName = apartmentMapping[reservation.listingMapId] || "Unknown Apartment";
-                  const modifiedByUser = reservation.modifiedByUser || "Unknown";
-
-                  console.log(`🔹 Reservation ${reservation.hostawayReservationId} modified by: ${modifiedByUser}`);
-
-                  const message = generateSlackMessage(
-                      reservation.hostawayReservationId,
-                      reservation.guestName,
-                      apartmentName,
-                      updates,
-                      modifiedByUser
-                  );
-                  console.log("🔹 Sending Slack Message: \n", message);
-                  sendMessageToSlack(message);
-              }
-          }
-      });
-
-      if (!hasUpdates) {
-          console.log("✅ No reservation updates detected.");
-      }
-
-      window.oldReservations = updatedReservations;
+    // console.log("✅ Hostaway users fetched and stored:", window.hostawayUsers);
   } catch (error) {
-      console.error("❌ Error updating reservations:", error);
+    console.error('❌ User Fetch Error:', error.message);
   }
 }
+
+
+async function updateAllReservations() {
+  try {
+    const response = await fetch("/api/reservations");
+    const data = await response.json();
+    console.log("📌 Fetching updated reservations...");
+    console.log("🔹 Response Data:", data.result);
+
+    const updatedReservations = data.result;
+    let hasUpdates = false;
+
+    const fieldsToCheck = ["guestName", "totalPrice", "arrivalDate", "departureDate", "numberOfGuests", "nights"];
+
+    updatedReservations.forEach((reservation) => {
+      if (reservation.status === "modified") {
+        const oldReservation = window.oldReservations.find(
+          (r) => r.hostawayReservationId === reservation.hostawayReservationId
+        );
+
+        const updates = [];
+        fieldsToCheck.forEach((field) => {
+          const oldValue = oldReservation ? oldReservation[field] : null;
+          const newValue = reservation[field];
+
+          if (oldValue !== newValue) {
+            updates.push({ field, oldValue, newValue });
+          }
+        });
+
+        if (updates.length > 0) {
+          hasUpdates = true;
+
+          // 🔥 Ensure `modifiedByUserId` is retrieved properly
+          const modifiedByUserId = reservation.modifiedByUserId || null;
+          const userName = window.hostawayUsers[modifiedByUserId] || "Unknown User";
+
+          console.log(`🔹 Reservation ${reservation.hostawayReservationId} modified by ${modifiedByUserId} (${userName})`);
+
+          // Send userId and userName in the PUT request
+          fetch(`/api/reservations/${reservation.hostawayReservationId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: modifiedByUserId, userName, ...reservation }),
+          });
+
+          // Send Slack notification with correct user
+          const message = generateSlackMessage(
+            reservation.hostawayReservationId,
+            reservation.guestName,
+            apartmentMapping[reservation.listingMapId],
+            updates,
+            userName
+          );
+          sendMessageToSlack(message);
+        }
+      }
+    });
+
+    if (!hasUpdates) {
+      sendMessageToSlack("✅ There are currently no updates to the reservations.");
+    }
+
+    window.oldReservations = updatedReservations;
+  } catch (error) {
+    console.error("❌ Error updating reservations:", error);
+  }
+}
+
+
+
+
+
 
 // Function to calculate number of nights between check-in (3 PM) and check-out (12 PM)
 function calculateNights(checkIn, checkOut) {
@@ -341,23 +374,146 @@ async function downloadReservations() {
       );
 
       console.log(`
-      Check-out #${index + 1}
-      Guest Name: ${reservation.guestName}
-      Apartment: ${apartmentName}
-      Channel: ${reservation.channelName}
-      Price: ${reservation.totalPrice} ${reservation.currency}
-      Check-in: ${reservation.arrivalDate} 
-      Check-out: ${reservation.departureDate} 
-      Nights: ${nights}
-      -------------------`);
+Check-out #${index + 1}
+Guest Name: ${reservation.guestName}
+Apartment: ${apartmentName}
+Channel: ${reservation.channelName}
+Price: ${reservation.totalPrice} ${reservation.currency}
+Check-in: ${reservation.arrivalDate} 
+Check-out: ${reservation.departureDate} 
+Nights: ${nights}
+-------------------`);
     });
   } catch (error) {
     console.error("Error fetching today's check-outs:", error);
   }
 }
 
+async function fetchRevenue() {
+  try {
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    console.log(`Today's date: ${today}`);
+
+    // First, fetch all reservations to get their IDs
+    const reservationsResponse = await fetch("https://api.hostaway.com/v1/reservations", {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI4MDA2NiIsImp0aSI6IjZkODk5MWMyZTI4MGQ0NDg3NmNhNDUyZmYxMWU5ZTcxNDFhNDJhMGIzMmViNzA3ZTQyMDFhYjY4OWQ3NDc2Yjk0NDZlZjA2NTZhY2QzMDkxIiwiaWF0IjoxNzIzOTk0NTQxLjcxOTMyNiwibmJmIjoxNzIzOTk0NTQxLjcxOTMyNywiZXhwIjoyMDM5NTI3MzQxLjcxOTMzMSwic3ViIjoiIiwic2NvcGVzIjpbImdlbmVyYWwiXSwic2VjcmV0SWQiOjM5NDM0fQ.aCE9HtgvxqTLuftdSe3I75s8DocQoBz949WG-NTot-qIzWRmruShmqkZNs8rtA_CyNNocOr_fahkXZBK3hHxQ4G6QxX9z8acQ_mJ68Wz5YKT39A6gAmu--5Ux_W6xdMpzb8J6f4SrdDJneC3RIWweT3KvZ832VIm1AmQDgHgJ7k',
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json'
+      }
+    });
+    const reservationsData = await reservationsResponse.json();
+    
+    if (!reservationsData.result || !Array.isArray(reservationsData.result)) {
+      console.log("No reservations found");
+      return;
+    }
+
+    console.log("=== Checking Reservation Dates ===");
+    
+    // Log all reservation dates for debugging
+    reservationsData.result.forEach(reservation => {
+      console.log(`Reservation ID: ${reservation.id}`);
+      console.log(`Arrival Date: ${reservation.arrivalDate}`);
+      console.log(`Reservation Date: ${reservation.reservationDate}`);
+      console.log('-------------------------');
+    });
+
+    let grandTotal = 0;
+    let todayReservationsCount = 0;
+    
+    // Fetch financial details for each reservation
+    for (const reservation of reservationsData.result) {
+      // Check if this reservation is for today
+      if (reservation.reservationDate === today) {
+        todayReservationsCount++;
+        const reservationId = reservation.id;
+
+        try {
+          const financeResponse = await fetch(`https://api.hostaway.com/v1/financeStandardField/reservation/${reservationId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI4MDA2NiIsImp0aSI6IjZkODk5MWMyZTI4MGQ0NDg3NmNhNDUyZmYxMWU5ZTcxNDFhNDJhMGIzMmViNzA3ZTQyMDFhYjY4OWQ3NDc2Yjk0NDZlZjA2NTZhY2QzMDkxIiwiaWF0IjoxNzIzOTk0NTQxLjcxOTMyNiwibmJmIjoxNzIzOTk0NTQxLjcxOTMyNywiZXhwIjoyMDM5NTI3MzQxLjcxOTMzMSwic3ViIjoiIiwic2NvcGVzIjpbImdlbmVyYWwiXSwic2VjcmV0SWQiOjM5NDM0fQ.aCE9HtgvxqTLuftdSe3I75s8DocQoBz949WG-NTot-qIzWRmruShmqkZNs8rtA_CyNNocOr_fahkXZBK3hHxQ4G6QxX9z8acQ_mJ68Wz5YKT39A6gAmu--5Ux_W6xdMpzb8J6f4SrdDJneC3RIWweT3KvZ832VIm1AmQDgHgJ7k',
+              'Cache-Control': 'no-cache',
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const financeData = await financeResponse.json();
+
+          if (financeData.result) {
+            // Sum up all the specified fields
+            const fieldsToSum = [
+              'damageDeposit', 'guestChannelFee', 'hostChannelFee', 'baseRate',
+              'salesTax', 'cityTax', 'otherTaxes', 'cleaningFeeValue',
+              'additionalCleaningFee', 'parkingFee', 'towelChangeFee',
+              'midstayCleaningFee', 'roomRequestFee', 'reservationChangeFee',
+              'checkinFee', 'lateCheckoutFee', 'otherFees', 'creditCardFee',
+              'kitchenLinenFee', 'linenPackageFee', 'transferFee', 'wristbandFee',
+              'extraBedsFee', 'serviceFee', 'bedLinenFee', 'bookingFee',
+              'petFee', 'skiPassFee', 'tourismFee', 'childrenExtraFee',
+              'resortFee', 'resortFeeAirbnb', 'communityFeeAirbnb',
+              'managementFeeAirbnb', 'linenFeeAirbnb', 'weeklyDiscount',
+              'roomTax', 'transientOccupancyTax', 'lodgingTax', 'hotelTax',
+              'guestNightlyTax', 'guestStayTax', 'guestPerPersonPerNightTax',
+              'propertyRentTax', 'priceForExtraPerson', 'monthlyDiscount',
+              'cancellationPayout', 'cancellationHostFee', 'couponDiscount',
+              'shareholderDiscount', 'lastMinuteDiscount', 'employeeDiscount',
+              'otherSpecialDiscount', 'paymentServiceProcessingFees',
+              'bookingComCancellationGuestFee', 'bookingcomPaymentProcessingFee',
+              'insuranceFee', 'airbnbClosedResolutionsSum', 'airbnbOpenResolutionsSum',
+              'airbnbPayoutSum', 'airbnbTransientOccupancyTax', 'airbnbPassThroughTax',
+              'hostCancellationPenalty', 'originalTotalPrice', 'earlyCheckinFee',
+              'guestServiceFee'
+            ];
+
+            let total = 0;
+            fieldsToSum.forEach(field => {
+              if (financeData.result[field] && typeof financeData.result[field] === 'number') {
+                total += financeData.result[field];
+              }
+            });
+
+            grandTotal += total;
+
+            // Display individual reservation total
+            console.log(`ID: ${reservationId} Total: ${total}`);
+          }
+
+          // Add a small delay to avoid hitting rate limits
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+        } catch (error) {
+          console.error(`Error fetching finance details for reservation ${reservationId}`);
+        }
+      }
+    }
+
+    if (todayReservationsCount === 0) {
+      console.log("No reservations found for today");
+    } else {
+      console.log("===========================");
+      console.log(`Total Reservations Today: ${todayReservationsCount}`);
+      console.log(`GRAND TOTAL: ${grandTotal}`);
+    }
+    console.log("=== End of Today's Totals ===");
+
+  } catch (error) {
+    console.error("Error in fetchRevenue:", error);
+  }
+}
+
+async function initializeApp() {
+  await fetchUsers(); // Fetch users first
+  await fetchReservations(); // Then fetch reservations
+}
+initializeApp();
+
+window.fetchUsers = fetchUsers;
 window.downloadReservations = downloadReservations;
 window.fetchReservations = fetchReservations;
 window.updateAllReservations = updateAllReservations;
+window.fetchRevenue = fetchRevenue;
 fetchReservations();
-
